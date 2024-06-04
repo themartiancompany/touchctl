@@ -1,0 +1,222 @@
+#!/usr/bin/env bash
+#
+# SPDX-License-Identifier: AGPL-3.0
+
+# I don't remember why
+# I had this shebang
+# so let's have it just in case
+# until next test
+#!/data/data/com.termux/files/usr/bin/env bash
+
+_bin="$( \
+  dirname \
+    "$( \
+      command \
+        -v \
+	  "env")")"
+_lib="${_bin}/../lib"
+_share="${_bin}/../share"
+source \
+  "${_lib}/libcrash-bash/crash-bash"
+
+_root_requirements() {
+  _check_cmd \
+    "su"
+}
+
+# shellcheck disable=SC2034
+_global_variables() {
+  input_command=""
+  input_device=""
+  setting_method=""
+  color=""
+  quiet=""
+}
+
+_root_touch_disable() {
+  local \
+    _device="${1}" \
+    _cmd=()
+  _cmd=(
+    "mv"
+    "${_device}"
+    "${_device}.disabled"
+  )
+  su \
+    -c \
+    "${_cmd[*]}"
+}
+
+_root_touch_enable() {
+  local \
+    _device="${1}" \
+    _cmd=()
+  _cmd=(
+    "mv"
+    "${_device}.disabled"
+    "${_device}"
+  )
+  su \
+    -c \
+    "${_cmd[*]}"
+}
+
+_root_touch_status() {
+  local \
+    _device="${1}"
+  if [ -e "${_device}" ]; then
+    echo \
+      "probably active"
+  fi
+}
+
+_auto_detect_method() {
+  local \
+    _os \
+    _method
+  _os="$( \
+    uname \
+      -o)"
+  if [[ "${_os}" == "Android" ]]; then
+    _method="root"
+    if [[ "$(command \
+               -v \
+               "su")" ]]; then
+      _method="root"
+    fi
+  fi
+  echo \
+    "${_method}"
+}
+
+_touchctl() {
+  local \
+    _cmd="${1}" \
+    _device="${2}" \
+    _method="${3}"
+    _opts=()
+  shift \
+    3
+  _opts=(
+    "$@"
+  )
+  if [[ "${_method}" == "auto" ]]; then 
+    _method="$( \
+      _auto_detect_method)"
+  fi
+  "_${_method}_touch_${_cmd}" \
+    "${_device}" \
+    "${_opts[*]}"
+}
+
+_set_overrides() {
+  _set_override \
+    "input" \
+    "device" \
+    "/dev/input/event0"
+  _set_override \
+    "setting" \
+    "method" \
+    "root"
+  if [[ -v override_color ]]; then
+    color="${override_color}"
+  elif [[ -z "${color}" ]]; then
+    color="n"
+  fi
+  if [[ -v override_quiet ]]; then
+    quiet="${override_quiet}"
+  elif [[ -z "${quiet}" ]]; then
+    quiet="y"
+  fi
+}
+
+# Show help usage, with an exit status.
+# $1: exit status number.
+_usage() {
+  local \
+    _usage_text
+  IFS='' \
+    read \
+      -r \
+      -d '' \
+      _usage_text << \
+        ENDUSAGETEXT || true
+
+Touchscreen control
+
+Usage:
+  $(_get "app" "name")
+    [options]
+    <command>
+  commands:
+    enable
+    disable
+    status
+  options:
+     -d                   Input device path.
+			  Default: $(_get "input" "device")
+     -m                   Setting method (root)
+			  Default: $(_get "setting" "method")
+     -h                   This message.
+     -v                   Enable verbose output
+ENDUSAGETEXT
+  _printf \
+    '%s\n' \
+    "${_usage_text}"
+  exit \
+    "${1}"
+}
+
+_globals
+_global_variables
+# shellcheck disable=SC2004
+# shellcheck disable=SC2034
+while \
+  getopts \
+    'd:m:cvh?' \
+    arg; do
+  case \
+    "${arg}" in
+    d) override_input_device="${OPTARG}" ;;
+    m) override_setting_method="${OPTARG}" ;;
+    c) override_color="y" ;;
+    v) override_quiet="n" ;;
+    h|?) _set_overrides && \
+	 _usage \
+           0 ;;
+    *)
+    _msg_error \
+      "Invalid argument '${arg}'" \
+      0 && \
+    _set_overrides && \
+    _usage \
+      1
+    ;;
+  esac
+done
+shift \
+  $(( \
+    OPTIND - 1 \
+  ))
+(( $# <= 1 )) && \
+  _usage \
+    1
+_set \
+  "input" \
+  "command" \
+  "${1}"
+_set_overrides
+_config_user_init \
+  "touchctl"
+_touchctl \
+  "$(_get \
+       "input" \
+       "command")" \
+  "$(_get \
+       "input" \
+       "device")" \
+  "$(_get \
+       "setting" \
+       "method")"
+
+# vim:set sw=2 sts=-1 et:
