@@ -6,7 +6,7 @@ DOC_DIR=$(DESTDIR)$(PREFIX)/share/doc/touchctl
 BIN_DIR=$(DESTDIR)$(PREFIX)/bin
 
 DOC_FILES=$(wildcard *.rst)
-SCRIPT_FILES=$(wildcard ssh-utils/*)
+SCRIPT_FILES=$(wildcard touchctl/*)
 
 all:
 
