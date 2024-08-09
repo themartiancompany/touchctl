@@ -65,6 +65,8 @@ _root_touch_enable() {
 _root_touch_status() {
   local \
     _device="${1}"
+  _msg_info \
+    "Checking status for ${_device}"
   if [ -e "${_device}" ]; then
     echo \
       "probably active"
