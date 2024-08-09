@@ -67,9 +67,15 @@ _root_touch_status() {
     _device="${1}"
   _msg_info \
     "Checking status for ${_device}"
-  if [ -e "${_device}" ]; then
+  if \
+    [ -e "${_device}" ]; then
     echo \
-      "probably active"
+      "enabled"
+  elif \
+    [ ! -e "${_device}" ] || \
+    [ -e "${_device}.disabled" ]; then
+    echo \
+      "disabled"
   fi
 }
 
