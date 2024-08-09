@@ -26,6 +26,7 @@ _root_requirements() {
 
 # shellcheck disable=SC2034
 _global_variables() {
+  touch_date=""
   input_command=""
   input_device=""
   setting_method=""
@@ -136,7 +137,7 @@ _show_config() {
   _msg_info "     Touch operation date:   $(_get "touch" "date")"
   _msg_info "            Input command:   $(_get "input" "command")"
   _msg_info "             Input device:   $(_get "touch" "device")"
-  _msg_info "         Touch set method:   $(_get "setting" "method")"
+  _msg_info "     Touch setting method:   $(_get "setting" "method")"
 }
 
 # Show help usage, with an exit status.
@@ -207,7 +208,8 @@ shift \
   $(( \
     OPTIND - 1 \
   ))
-(( $# <= 1 )) && \
+(( $# < 1 )) && \
+  _set_overrides && \
   _usage \
     1
 _set \
@@ -215,18 +217,21 @@ _set \
   "command" \
   "${1}"
 _set_overrides
+app_opts=(
+  "$(_get \
+       "input" \
+       "command")"
+  "$(_get \
+       "input" \
+       "device")"
+  "$(_get \
+       "setting" \
+       "method")"
+)
 _config_user_init \
   "touchctl"
 _show_config
 _touchctl \
-  "$(_get \
-       "input" \
-       "command")" \
-  "$(_get \
-       "input" \
-       "device")" \
-  "$(_get \
-       "setting" \
-       "method")"
+  "${app_opts[@]}"
 
 # vim:set sw=2 sts=-1 et:
