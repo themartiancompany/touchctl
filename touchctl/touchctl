@@ -136,7 +136,7 @@ _show_config() {
   _msg_info "${app_name} configuration"
   _msg_info "     Touch operation date:   $(_get "touch" "date")"
   _msg_info "            Input command:   $(_get "input" "command")"
-  _msg_info "             Input device:   $(_get "touch" "device")"
+  _msg_info "             Input device:   $(_get "input" "device")"
   _msg_info "     Touch setting method:   $(_get "setting" "method")"
 }
 
