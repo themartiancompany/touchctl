@@ -30,6 +30,7 @@ _global_variables() {
   input_command=""
   input_device=""
   setting_method=""
+  device_type=""
   color=""
   quiet=""
 }
@@ -64,9 +65,13 @@ _root_touch_enable() {
 
 _root_touch_status() {
   local \
-    _device="${1}"
+    _device="${1}" \
+    _msg=()
+  _msg=(
+    "Checking status for ${_device}."
+  )
   _msg_info \
-    "Checking status for ${_device}"
+    "${_msg[*]}"
   if \
     [ -e "${_device}" ]; then
     echo \
@@ -118,15 +123,10 @@ _touchctl() {
     "${_opts[*]}"
 }
 
+_input_device_auto_detect() {
+}
+
 _set_overrides() {
-  _set_override \
-    "input" \
-    "device" \
-    "/dev/input/event0"
-  _set_override \
-    "setting" \
-    "method" \
-    "root"
   if [[ -v override_color ]]; then
     color="${override_color}"
   elif [[ -z "${color}" ]]; then
@@ -137,15 +137,27 @@ _set_overrides() {
   elif [[ -z "${quiet}" ]]; then
     quiet="y"
   fi
+  _set_override \
+    "device" \
+    "type" \
+    "touchscreen"
+  _set_override \
+    "input" \
+    "device" \
+    "/dev/input/event0"
+  _set_override \
+    "setting" \
+    "method" \
+    "root"
 }
 
 # Shows configuration options.
 _show_config() {
   _msg_info "${app_name} configuration"
-  _msg_info "     Touch operation date:   $(_get "touch" "date")"
-  _msg_info "            Input command:   $(_get "input" "command")"
-  _msg_info "             Input device:   $(_get "input" "device")"
-  _msg_info "     Touch setting method:   $(_get "setting" "method")"
+  _msg_info "     Touch operation date:   ${touch_date}"
+  _msg_info "            Input command:   ${input_command}"
+  _msg_info "             Input device:   ${input_device}"
+  _msg_info "     Touch setting method:   ${setting_method}"
 }
 
 # Show help usage, with an exit status.
@@ -163,7 +175,7 @@ _usage() {
 Touchscreen control
 
 Usage:
-  $(_get "app" "name")
+  ${app_name}
     [options]
     <command>
   commands:
@@ -171,10 +183,17 @@ Usage:
     disable
     status
   options:
+     -t                   Input device type.
+                          It can be 'touchscreen'
+                          or 'touchpad'.
+                          Default: ${device_type}
      -d                   Input device path.
-			  Default: $(_get "input" "device")
+                          It gets auto-detected when
+                          only one touch input device
+                          is found.
+                          Default: ${input_device}
      -m                   Setting method (root)
-			  Default: $(_get "setting" "method")
+                          Default: ${setting_method}
      -h                   This message.
      -v                   Enable verbose output
 ENDUSAGETEXT
@@ -191,50 +210,53 @@ _global_variables
 # shellcheck disable=SC2034
 while \
   getopts \
-    'd:m:cvh?' \
+    't:d:m:cvh?' \
     arg; do
   case \
     "${arg}" in
-    d) override_input_device="${OPTARG}" ;;
-    m) override_setting_method="${OPTARG}" ;;
-    c) override_color="y" ;;
-    v) override_quiet="n" ;;
-    h|?) _set_overrides && \
+    t)
+      override_device_type="${OPTARG}" ;;
+    d)
+      override_input_device="${OPTARG}" ;;
+    m)
+      override_setting_method="${OPTARG}" ;;
+    c)
+      override_color="y" ;;
+    v)
+      override_quiet="n" ;;
+    h|?)
+      _set_overrides
 	 _usage \
            0 ;;
     *)
-    _msg_error \
-      "Invalid argument '${arg}'" \
-      0 && \
-    _set_overrides && \
-    _usage \
-      1
-    ;;
+      _msg=(
+        "Invalid argument '${arg}'."
+      )
+      _msg_error \
+        "${_msg[*]}" \
+        0 && \
+      _set_overrides
+      _usage \
+        1
+      ;;
   esac
 done
 shift \
-  $(( \
+  $((
     OPTIND - 1 \
   ))
-(( $# < 1 )) && \
-  _set_overrides && \
+if (( $# < 1 )); then
+  _set_overrides
   _usage \
     1
-_set \
-  "input" \
-  "command" \
-  "${1}"
+fi
+input_command="${1}"
 _set_overrides
 app_opts=(
-  "$(_get \
-       "input" \
-       "command")"
-  "$(_get \
-       "input" \
-       "device")"
-  "$(_get \
-       "setting" \
-       "method")"
+  "${input_command}"
+  "${input_device}"
+  "${device_type}"
+  "${setting_method}"
 )
 _config_user_init \
   "touchctl"
