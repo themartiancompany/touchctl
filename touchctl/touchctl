@@ -21,6 +21,11 @@ source \
 
 _root_requirements() {
   _check_cmd \
+    "awk" \
+    "gawk"
+  _check_cmd \
+    "grep"
+  _check_cmd \
     "su" || \
   _check_cmd \
     "sudo"
@@ -140,7 +145,7 @@ _input_devices_get() {
     _abs_line \
     _abs_assignment \
     _abs
-  local \
+  declare \
     -A \
     _devices
   _os="$(
@@ -168,33 +173,35 @@ _input_devices_get() {
     $'\n' \
     _out < \
     <("${_cmd[@]}")
-  _index=0
+  _index="0"
   for _line in "${_out[@]}"; do
     _text="${_line%$'\n'}"
-    if [[ "${_text}" == "I: "* ]]; then
-      _device=(
-        "${_text}"
-      )
-    echo "${_device[*]}"
-    elif [[ "${_text}" == "\n\n" ]]; then
+    if [[ "${_text}" == *": "* ]]; then
+      if [[ "${_text}" == "I: "* ]]; then
+        _device=(
+          "${_text}"
+        )
+      else
+        _device+=(
+          "${_text}"
+        )
+      fi
+    else
+    # elif [[ "${_text}" == "\n\n" ]]; then
       _devices["${_index}"]="$(
         printf \
           "%s\n" \
           "${_device[@]}")"
-      echo "${_device[*]}"
       _index="$((
         _index + 1))"
-    else
-      _device+=(
-        "${_text}"
+      _msg=(
+        "Adding device '${_device}'"
+        "to devices list."
       )
-      echo "${_device[*]}"
     fi
   done
-  echo "${_devices[@]}"
   for _index in "${!_devices[@]}"; do
     _device="${_devices["${_index}"]}"
-    echo "${_device}"
     _abs_line="$(
       echo \
         "${_device}" |
@@ -206,10 +213,8 @@ _input_devices_get() {
         echo \
           "${_abs_line}" |
           awk \
-            '{print 2}')"
+            '{print $2}')"
       _abs="${_abs_assignment#ABS=}"
-      echo \
-        "${_abs_line}"
       if (( 1000 < "${_abs}" )); then
         _event_line="$(
           echo \
