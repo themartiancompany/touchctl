@@ -47,9 +47,11 @@ _root_touch_disable() {
     _device="${1}" \
     _cmd=()
   _cmd=(
-    "mv"
-    "${_device}"
-    "${_device}.disabled"
+    # "mv"
+    "chmod"
+      "000"
+      "${_device}"
+      # "${_device}.disabled"
   )
   su \
     -c \
@@ -61,9 +63,12 @@ _root_touch_enable() {
     _device="${1}" \
     _cmd=()
   _cmd=(
-    "mv"
-    "${_device}.disabled"
-    "${_device}"
+    # "mv"
+    "chmod"
+      "0660"
+      "${_device}"
+    # "${_device}.disabled"
+    #"${_device}"
   )
   su \
     -c \
@@ -115,8 +120,7 @@ _touchctl() {
     _cmd="${1}" \
     _type="${2}" \
     _method="${3}"
-    _opts=() \
-    _device
+    _opts=()
   shift \
     3
   _input_devices=(
@@ -144,7 +148,10 @@ _input_devices_get() {
     _index \
     _abs_line \
     _abs_assignment \
-    _abs
+    _abs \
+    _event \
+    _event_line \
+    _event_no
   declare \
     -A \
     _devices
@@ -222,8 +229,9 @@ _input_devices_get() {
             grep \
              "^S: Sysfs")"
         _event="${_event_line##*/}"
+        _event_no="${_event##input}"
         _input_devices+=(
-          "/dev/input/${_event}"
+          "/dev/input/event${_event_no}"
         )
       fi
     fi
@@ -237,9 +245,16 @@ _input_devices_get() {
 
 _input_devices_auto_detect() {
   local \
-    _input_devices=()
-  _input_devices_get
+    _input_devices=() \
+    _msg=()
   if [[ "${input_devices[*]}" == "" ]]; then
+    _msg=(
+      "No input devices in input,"
+      "auto-detecting."
+    )
+    _msg_info \
+      "${_msg[*]}"
+    _input_devices_get
     input_devices=(
       "${_input_devices[@]}"
     )
@@ -274,7 +289,7 @@ _show_config() {
   _msg_info "     Touch operation date:   ${touch_date}"
   _msg_info "            Input command:   ${input_command}"
   _msg_info "              Device type:   ${device_type}"
-  _msg_info "             Input device:   ${input_device}"
+  _msg_info "            Input devices:   ${input_devices[*]}"
   _msg_info "     Touch setting method:   ${setting_method}"
 }
 
@@ -314,6 +329,7 @@ Usage:
                           Default: ${setting_method}
      -h                   This message.
      -v                   Enable verbose output
+
 ENDUSAGETEXT
   _printf \
     '%s\n' \
