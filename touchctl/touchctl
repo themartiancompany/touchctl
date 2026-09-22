@@ -21,14 +21,16 @@ source \
 
 _root_requirements() {
   _check_cmd \
-    "su"
+    "su" || \
+  _check_cmd \
+    "sudo"
 }
 
 # shellcheck disable=SC2034
 _global_variables() {
   touch_date=""
   input_command=""
-  input_device=""
+  input_devices=()
   setting_method=""
   device_type=""
   color=""
@@ -88,7 +90,7 @@ _auto_detect_method() {
   local \
     _os \
     _method
-  _os="$( \
+  _os="$(
     uname \
       -o)"
   if [[ "${_os}" == "Android" ]]; then
@@ -106,24 +108,137 @@ _auto_detect_method() {
 _touchctl() {
   local \
     _cmd="${1}" \
-    _device="${2}" \
+    _type="${2}" \
     _method="${3}"
-    _opts=()
+    _opts=() \
+    _device
   shift \
     3
-  _opts=(
+  _input_devices=(
     "$@"
   )
   if [[ "${_method}" == "auto" ]]; then 
     _method="$( \
       _auto_detect_method)"
   fi
-  "_${_method}_touch_${_cmd}" \
-    "${_device}" \
-    "${_opts[*]}"
+  for _device in "${_input_devices[@]}"; do
+    "_${_method}_touch_${_cmd}" \
+      "${_device}" \
+      "${_opts[*]}"
+  done
 }
 
-_input_device_auto_detect() {
+_input_devices_get() {
+  local \
+    _cmd=() \
+    _out \
+    _os \
+    _su \
+    _msg=() \
+    _device=() \
+    _index \
+    _abs_line \
+    _abs_assignment \
+    _abs
+  local \
+    -A \
+    _devices
+  _os="$(
+    uname \
+      -o)"
+  if [[ "${_os}" == "Android" ]]; then
+    _msg=(
+      "Detected Android OS,"
+      "reading input devices requires"
+      "root permission."
+    )
+    _msg_info \
+      "${_msg[*]}"
+    _cmd=(
+      "su"
+        "-c"
+    )
+  fi
+  _cmd+=(
+    "cat"
+      "/proc/bus/input/devices"
+  )
+  mapfile \
+    -d \
+    $'\n' \
+    _out < \
+    <("${_cmd[@]}")
+  _index=0
+  for _line in "${_out[@]}"; do
+    _text="${_line%$'\n'}"
+    if [[ "${_text}" == "I: "* ]]; then
+      _device=(
+        "${_text}"
+      )
+    echo "${_device[*]}"
+    elif [[ "${_text}" == "\n\n" ]]; then
+      _devices["${_index}"]="$(
+        printf \
+          "%s\n" \
+          "${_device[@]}")"
+      echo "${_device[*]}"
+      _index="$((
+        _index + 1))"
+    else
+      _device+=(
+        "${_text}"
+      )
+      echo "${_device[*]}"
+    fi
+  done
+  echo "${_devices[@]}"
+  for _index in "${!_devices[@]}"; do
+    _device="${_devices["${_index}"]}"
+    echo "${_device}"
+    _abs_line="$(
+      echo \
+        "${_device}" |
+        grep \
+          "^B: ABS=" || \
+        true)"
+    if [[ "${_abs_line}" != "" ]]; then
+      _abs_assignment="$(
+        echo \
+          "${_abs_line}" |
+          awk \
+            '{print 2}')"
+      _abs="${_abs_assignment#ABS=}"
+      echo \
+        "${_abs_line}"
+      if (( 1000 < "${_abs}" )); then
+        _event_line="$(
+          echo \
+            "${_device}" |
+            grep \
+             "^S: Sysfs")"
+        _event="${_event_line##*/}"
+        _input_devices+=(
+          "/dev/input/${_event}"
+        )
+      fi
+    fi
+  done
+  _msg=(
+    "Got devices '${_input_devices[*]}'."
+  )
+  _msg_info \
+    "${_msg[*]}"
+}
+
+_input_devices_auto_detect() {
+  local \
+    _input_devices=()
+  _input_devices_get
+  if [[ "${input_devices[*]}" == "" ]]; then
+    input_devices=(
+      "${_input_devices[@]}"
+    )
+  fi
 }
 
 _set_overrides() {
@@ -141,10 +256,7 @@ _set_overrides() {
     "device" \
     "type" \
     "touchscreen"
-  _set_override \
-    "input" \
-    "device" \
-    "/dev/input/event0"
+  _input_devices_auto_detect
   _set_override \
     "setting" \
     "method" \
@@ -156,6 +268,7 @@ _show_config() {
   _msg_info "${app_name} configuration"
   _msg_info "     Touch operation date:   ${touch_date}"
   _msg_info "            Input command:   ${input_command}"
+  _msg_info "              Device type:   ${device_type}"
   _msg_info "             Input device:   ${input_device}"
   _msg_info "     Touch setting method:   ${setting_method}"
 }
@@ -191,7 +304,7 @@ Usage:
                           It gets auto-detected when
                           only one touch input device
                           is found.
-                          Default: ${input_device}
+                          Default: ${input_devices[*]}
      -m                   Setting method (root)
                           Default: ${setting_method}
      -h                   This message.
@@ -217,7 +330,9 @@ while \
     t)
       override_device_type="${OPTARG}" ;;
     d)
-      override_input_device="${OPTARG}" ;;
+      input_devices+=(
+        "${OPTARG}"
+      ) ;;
     m)
       override_setting_method="${OPTARG}" ;;
     c)
@@ -226,8 +341,8 @@ while \
       override_quiet="n" ;;
     h|?)
       _set_overrides
-	 _usage \
-           0 ;;
+      _usage \
+        0 ;;
     *)
       _msg=(
         "Invalid argument '${arg}'."
@@ -254,9 +369,9 @@ input_command="${1}"
 _set_overrides
 app_opts=(
   "${input_command}"
-  "${input_device}"
   "${device_type}"
   "${setting_method}"
+  "${input_devices[@]}"
 )
 _config_user_init \
   "touchctl"
